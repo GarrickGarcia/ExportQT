@@ -11,7 +11,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowIcon(QIcon('download_icon.png'))
+        self.setWindowIcon(QIcon('Icon/download_icon.png'))
         self.setWindowTitle('Export Layer')
         self.resize(500, 350)
         description_label = QLabel('This tool allows you to export a layer from ArcGIS Online to a local shapefile. Please enter your ArcGIS Online credentials, the URL of the service, an optional SQL query, and the output folder.')
