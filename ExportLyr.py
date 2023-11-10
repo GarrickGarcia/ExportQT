@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLineEdit, QPushButton, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QProgressBar, QCheckBox, QFileDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLineEdit, QPushButton, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QProgressBar, QCheckBox, QFileDialog, QMessageBox, QApplication
 from PyQt6.QtGui import QIcon
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayer
@@ -20,14 +20,20 @@ class MainWindow(QMainWindow):
 
         self.setWindowIcon(QIcon(os.path.join(datadir, 'download_icon.png')))
         self.setWindowTitle('Export Layer')
-        self.resize(500, 350)
-        description_label = QLabel('This tool allows you to export a layer from ArcGIS Online to a local shapefile. Please enter your ArcGIS Online credentials, the URL of the service, an optional SQL query, and the output folder.')
+        self.resize(700, 420)
+        description_label = QLabel('This tool allows you to export a layer from ArcGIS Online or Enterprise Portal to a local shapefile. Please enter your ArcGIS credentials, the URL of the service, an optional SQL query, the name for the output, and the output folder.')
         description_label.setWordWrap(True)
+        self.portal_url_input = QLineEdit()
+        self.portal_url_input.setPlaceholderText("Leave blank if using ArcGIS Online. Example: https://maps.myorg.org/portal/")
         self.username_input = QLineEdit()
         self.password_input = QLineEdit()
         self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("URL of specific layer. Example: https://services7.arcgis.com/xxx/arcgis/rest/services/Name/FeatureServer/0 ")
         self.query_input = QLineEdit()
+        self.query_input.setPlaceholderText("Optional to filter the output. Example: OBJECTID = 10 or TYPE = 'Water'")
         self.last_created_checkbox = QCheckBox('Last Created Feature Only')
+        self.output_name_input = QLineEdit()
+        self.output_name_input.setPlaceholderText("Enter the name of the output files without the .shp extension")
         self.folder_input = QLineEdit()
 
         self.browse_button = QPushButton('Browse')
@@ -39,21 +45,25 @@ class MainWindow(QMainWindow):
         self.run_button = QPushButton('Run')
         self.run_button.clicked.connect(self.run_query)
 
-        self.progress_bar = QProgressBar()  # Create a QProgressBar instance
+        self.progress_bar = QProgressBar()
+        required_label = QLabel("* designates required input")
 
         layout = QVBoxLayout()
         layout.addWidget(description_label)
-        layout.addLayout(self.create_input_layout('AGOL Username:', self.username_input))
-        layout.addLayout(self.create_input_layout('Password:', self.password_input))
-        layout.addLayout(self.create_input_layout('Service URL:', self.url_input))
+        layout.addLayout(self.create_input_layout('Portal URL:', self.portal_url_input))
+        layout.addLayout(self.create_input_layout('*Username:', self.username_input))
+        layout.addLayout(self.create_input_layout('*Password:', self.password_input))
+        layout.addLayout(self.create_input_layout('*Service URL:', self.url_input))
         layout.addLayout(self.create_input_layout('SQL Query:', self.query_input))
         layout.addWidget(self.last_created_checkbox)
-        folder_layout = self.create_input_layout('Folder:', self.folder_input)
-        folder_layout.addWidget(self.browse_button)  # Add the browse button to the folder layout
+        layout.addLayout(self.create_input_layout('*Output Name:', self.output_name_input))
+        folder_layout = self.create_input_layout('*Folder:', self.folder_input)
+        folder_layout.addWidget(self.browse_button)
         layout.addLayout(folder_layout)
         layout.addWidget(self.clear_button)
         layout.addWidget(self.run_button)
-        layout.addWidget(self.progress_bar)  # Add the progress bar to the layout
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(required_label)
 
         container = QWidget()
         container.setLayout(layout)
@@ -80,42 +90,49 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
 
     def run_query(self):
-        username = self.username_input.text()
-        password = self.password_input.text()
-        url = self.url_input.text()
-        folder = self.folder_input.text()
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        out_name = f'output_{timestamp}'
+        try:
+            username = self.username_input.text()
+            password = self.password_input.text()
+            url = self.url_input.text()
+            folder = self.folder_input.text()
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_base_name = self.output_name_input.text()
+            out_name = f'{output_base_name}_{timestamp}'
 
-        # Update the progress bar
-        self.progress_bar.setValue(25)
+            # Update the progress bar
+            self.progress_bar.setValue(25)
 
-        gis = GIS("https://www.arcgis.com", username, password)
-        feature_layer = FeatureLayer(url)
-        sedf = pd.DataFrame.spatial.from_layer(feature_layer)
+            portal_url = self.portal_url_input.text()
+            gis_url = portal_url if portal_url else "https://www.arcgis.com"  # Use the portal URL if it's filled in, otherwise use the ArcGIS Online URL
+            gis = GIS(gis_url, username, password)
+            feature_layer = FeatureLayer(url)
+            sedf = pd.DataFrame.spatial.from_layer(feature_layer)
 
-        # Update the progress bar
-        self.progress_bar.setValue(50)
+            # Update the progress bar
+            self.progress_bar.setValue(50)
 
-        # Perform the query on the SeDF
-        query = self.query_input.text()
-        if query:
-            sedf = sedf.query(query)
+            # Perform the query on the SeDF
+            query = self.query_input.text()
+            if query:
+                sedf = sedf.query(query)
 
-        # If the checkbox is checked, filter the SeDF to only include the most recently created feature
-        if self.last_created_checkbox.isChecked():
-            max_objectid = sedf['OBJECTID'].max()
-            sedf = sedf[sedf['OBJECTID'] == max_objectid]
+            # If the checkbox is checked, filter the SeDF to only include the most recently created feature
+            if self.last_created_checkbox.isChecked():
+                objectid_field = 'OBJECTID' if 'OBJECTID' in sedf.columns else 'objectid'
+                max_objectid = sedf[objectid_field].max()
+                sedf = sedf[sedf[objectid_field] == max_objectid]
 
-        # Update the progress bar
-        self.progress_bar.setValue(75)
+            # Update the progress bar
+            self.progress_bar.setValue(75)
 
-        # Export the sedf to a shapefile
-        shapefile_path = os.path.join(folder, out_name + '.shp')
-        sedf.spatial.to_featureclass(location=shapefile_path)
+            # Export the sedf to a shapefile
+            shapefile_path = os.path.join(folder, out_name + '.shp')
+            sedf.spatial.to_featureclass(location=shapefile_path)
 
-        # Update the progress bar
-        self.progress_bar.setValue(100)
+            # Update the progress bar
+            self.progress_bar.setValue(100)
+        except Exception as e:
+                QMessageBox.critical(self, "Error", "An error occurred while running the query.\n" + str(e))
 
 def main():
     app = QApplication([])
