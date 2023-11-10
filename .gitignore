@@ -1,2 +1,7 @@
 *.code-workspace
 *.yaml
+*.spec
+*.pyc
+/build/
+/dist/
+/Install/

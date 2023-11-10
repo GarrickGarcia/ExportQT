@@ -5,13 +5,20 @@ from arcgis.features import FeatureLayer
 import pandas as pd
 import fiona
 import os
+import sys
 from datetime import datetime
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowIcon(QIcon('Icon/download_icon.png'))
+        # Get the path to the data directory
+        if getattr(sys, 'frozen', False):
+            datadir = os.path.join(sys._MEIPASS, 'Icon')
+        else:
+            datadir = 'Icon'
+
+        self.setWindowIcon(QIcon(os.path.join(datadir, 'download_icon.png')))
         self.setWindowTitle('Export Layer')
         self.resize(500, 350)
         description_label = QLabel('This tool allows you to export a layer from ArcGIS Online to a local shapefile. Please enter your ArcGIS Online credentials, the URL of the service, an optional SQL query, and the output folder.')
