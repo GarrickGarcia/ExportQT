@@ -1,7 +1,8 @@
 # ExportQT
 
-PyQT6 App for Exporting ArcGIS Layer to SHP
+PyQT6 GUI App for Exporting ArcGIS feature service Layer to local SHP
 
-uses PyQt6, fiona, arcgis libraries installed via pip
+Uses PyQt6, fiona, arcgis libraries installed via pip
 
-trying to compile with pyinstaller to an executable but getting errors
+Compiles with PyInstaller into Exe with supporting files.
+Created installer with InstallForge
